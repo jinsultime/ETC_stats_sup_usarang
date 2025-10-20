@@ -274,17 +274,48 @@
       const byRoomBand={};
       merged.forEach(r=>{ const band=getAgeBand(r.age); (byRoomBand[r.room]??=( {} ))[band]??=[]; byRoomBand[r.room][band].push(r); });
       const orderRooms=['1진료실','2진료실','3진료실','4진료실','5진료실'];
-      const orderBands=['0-18세 미만','18세 이상~20대','30대','40대','50대','60대','70대 이상','미상'];
+      // '전체'를 첫 번째로, 그 다음 요청하신 연령대 순서
+      const orderBands=['전체','0-18세 미만','18세 이상~20대','30대','40대','50대','60대','70대 이상','미상'];
       const rows=[];
       const roomKeys=Object.keys(byRoomBand).sort((a,b)=>{const ai=orderRooms.indexOf(a),bi=orderRooms.indexOf(b);if(ai===-1&&bi===-1)return a.localeCompare(b);if(ai===-1)return 1;if(bi===-1)return -1;return ai-bi});
       for(const room of roomKeys){
+        // 전체(연령 합계) 먼저 계산
+        const allArr = Object.values(byRoomBand[room]).flat();
+        if (allArr.length){
+          const injAll = allArr.filter(x=>x.inj>0); const injAllN = injAll.length;
+          const avgInjAll = injAllN ? average(injAll.map(x=>x.inj)) : 0;
+          const avgVisitAll = average(allArr.map(x=>x.visit));
+          const revisit2pAll = allArr.filter(x=>x.visit>=2).length;
+          const cntA=(n)=>injAll.filter(x=> n===8 ? x.inj>=8 : x.inj===n).length;
+          const rateA=(n)=>toPercent(cntA(n),injAllN);
+          rows.push({
+            '진료실':room,
+            '연령대':'전체',
+            '초진환자수':allArr.length,
+            '초진주사환자수':injAllN,
+            '초진 주사처방률':toPercent(injAllN,allArr.length),
+            '초진 평균 내원횟수':avgVisitAll.toFixed(1),
+            '초진 재내원율(2회 이상)':toPercent(revisit2pAll,allArr.length),
+            '초진 주사환자 평균 주사횟수':avgInjAll.toFixed(1),
+            '주사 1회(%)':rateA(1),
+            '2회(%)':rateA(2),
+            '3회(%)':rateA(3),
+            '4회(%)':rateA(4),
+            '5회(%)':rateA(5),
+            '6회(%)':rateA(6),
+            '7회(%)':rateA(7),
+            '8회 이상(%)':rateA(8)
+          });
+        }
+        // 이후 각 연령대 순서대로
         const bands=byRoomBand[room];
         for(const band of orderBands){
+          if (band==='전체') continue; // 이미 위에서 추가
           const arr=bands[band]||[]; if(!arr.length) continue;
           const inj=arr.filter(x=>x.inj>0); const injN=inj.length;
           const avgInj = injN? average(inj.map(x=>x.inj)) : 0;
-          const avgVisitAll = average(arr.map(x=>x.visit));
-          const revisit2pAll = arr.filter(x=>x.visit>=2).length;
+          const avgVisit = average(arr.map(x=>x.visit));
+          const revisit2p = arr.filter(x=>x.visit>=2).length;
           const cnt=(n)=>inj.filter(x=> n===8 ? x.inj>=8 : x.inj===n).length;
           const rate=(n)=>toPercent(cnt(n),injN);
           rows.push({
@@ -293,8 +324,8 @@
             '초진환자수':arr.length,
             '초진주사환자수':injN,
             '초진 주사처방률':toPercent(injN,arr.length),
-            '초진 평균 내원횟수':avgVisitAll.toFixed(1),
-            '초진 재내원율(2회 이상)':toPercent(revisit2pAll,arr.length),
+            '초진 평균 내원횟수':avgVisit.toFixed(1),
+            '초진 재내원율(2회 이상)':toPercent(revisit2p,arr.length),
             '초진 주사환자 평균 주사횟수':avgInj.toFixed(1),
             '주사 1회(%)':rate(1),
             '2회(%)':rate(2),
